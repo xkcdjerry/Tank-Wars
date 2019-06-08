@@ -17,6 +17,9 @@ MAXWIDTH = WIDTH-1
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+ORANGE = (250, 210, 80)
 
 FPS = 30
 MAX_FPS = 10000
@@ -41,17 +44,24 @@ CHAR_SIZE = 60
 ICON = virtual.load("icon.png")
 
 virtual.config(CHAR_SIZE, CHAR_SIZE)
-PLAYER = virtual.load("player-1.png")
+PLAYER0 = virtual.load("player-0.png")
+PLAYER1 = virtual.load("player-1.png")
 ENEMY = virtual.load("enemy.png")
+TOMB = virtual.load("dead_player.png")
 virtual.clear()
 
-
+TITLE = virtual.load("game_title.png")
+MINE = virtual.load("mine.png")
+SELECT_PLAYER_IMGS = (virtual.load("one_player.png"), virtual.load("two_players.png"))
 EXPLODE = virtual.load("explode.png")
 BG = pygame.transform.smoothscale(virtual.load("bg.png"), SIZE)
 GAMEOVERFONT = pygame.font.Font("freesansbold.ttf", TEXTSIZE)
 NUMFONT = pygame.font.Font("freesansbold.ttf", NUMSIZE)
-IMG = {"PLAYER": PLAYER,
+IMG = {"PLAYER0": PLAYER0,
+       "PLAYER1": PLAYER1,
+       "TOMB": TOMB,
        "ENEMY": ENEMY,
+       "MINE": MINE,
        "BULLET": virtual.load("bullet.png"),
        "EXPLODE": EXPLODE,
        "SHIELD": virtual.load("shield.png"),
@@ -84,6 +94,13 @@ ANGLE_DICT_2 = {frozenset((UP, RIGHT)): (315, (1, -1)),
                 frozenset((DOWN, RIGHT)): (215, (1, 1))}
 picturecache = {}
 effectcache = {}
+
+
+def get_window():
+    win = pygame.display.set_mode(SIZE)
+    pygame.display.set_caption("War Tanks %s,by xkcdjerry" % VERSION)
+    pygame.display.set_icon(ICON)
+    return win
 
 
 def cache(img_name, angle=0):
@@ -124,7 +141,7 @@ def save_best(best):
         return pickle.dump(best, f)
 
 
-def text(font, text, color=BLACK, bg=WHITE, center=MID, _bg=True):
+def mktext(font, text, color=BLACK, bg=WHITE, center=MID, _bg=True):
     if _bg:
         surf = font.render(text, True, color, bg)
     else:
@@ -149,7 +166,7 @@ def waitforkey():
 
 
 def merge_stoptime(stop1, stop2):
-    'merge stop1 and stop2 to stop1(IN PLACE)'
+    """merge stop1 and stop2 to stop1(IN PLACE)"""
     assert len(stop1) == len(stop2), "different lenth"
     for i in range(len(stop1)):
         stop1[i] = max(stop1[i], stop2[i])

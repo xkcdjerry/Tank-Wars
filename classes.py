@@ -1,25 +1,25 @@
 import time
 import random
 import itertools
-import pickle
 
 from locals import *
 
-
+# TODO:when in many-player mode,keep  a scoreboard for every player (the per-player scoreboard is not saved)
 # 目的：完全整合各类，消除Game类里本该是其它类的冗余代码
 # 使得他容易拓展成联网版本（未开始拓展）
+
+
 class Char:
     # Father for all player/foes
-    def __getstate__(self):
-        return self.__dict__
-
-    def __setstate__(self, dct):
-        self.__dict__.update(dct)
+    pass
 
 
 class Player(Char):
     OPR = {BLOOD: lambda player: player.set_blood(player.blood+1)}
-    # in range:LEFT      #DOWN      #RIGHT     UP        FIRE        MINES
+    STARTS = (MAXWIDTH-80-len(POWERUPS)*40, 15)
+    BLOODCOLORS = (GREEN, ORANGE)
+    IMGS = (PLAYER0, PLAYER1)
+    # in range:LEFT      DOWN      RIGHT     UP        FIRE        MINES
     ALL = (
         (pygame.K_a, pygame.K_s, pygame.K_d, pygame.K_w,
          pygame.K_j, pygame.K_k),
@@ -27,15 +27,26 @@ class Player(Char):
          pygame.K_KP0, pygame.K_KP_PERIOD)
     )
 
-    def __init__(self, pos, game, cnt=0):
-        'pos:位置元组 (x,y)'
-        self.movekeys = Player.ALL[cnt]
+    def __init__(self, pos, game, cnt=0, oneplayer=False):
+        """pos:位置元组 (x,y)
+        :type pos: tuple
+        :type game: Game
+        :type cnt: int
+        :type oneplayer: bool
+
+
+        """
+        self.cnt = cnt if not oneplayer else 0  # use the green
+        self.movekeys = Player.ALL[cnt] if not oneplayer else Player.ALL[0]
+        self.blood_xstart = Player.STARTS[cnt] if not oneplayer else Player.STARTS[-1]
+        self.effect_xstart = self.blood_xstart if not oneplayer else Player.STARTS[0]
+        self.bloodcolor = Player.BLOODCOLORS[cnt] if not oneplayer else RED
         self.endtime = 0
         self.game = game
         self.angle = 0  # up
         self.pos = list(pos)
         self.face = (0, 0)
-        self.img = PLAYER
+        self.img = Player.IMGS[cnt]
         self.darttime = 0
         self.rect = self.img.get_rect()
         self.rect.center = pos
@@ -61,7 +72,7 @@ class Player(Char):
 
     def update(self, down_keys):
         going = []
-        K_LEFT, K_DOWN, K_RIGHT, K_UP, K_FIRE, K_MINE = self.movekeys
+        k_left, k_down, k_right, k_up, k_fire, k_mine = self.movekeys
         for i in range(len(self.stop)):
             if self.stop[i] < time.time():
                 self.stop_effect(POWERUPS[i])
@@ -72,7 +83,7 @@ class Player(Char):
             speed = SPEED
         if time.time() > self.darttime:
             self.fire = True
-        if K_FIRE in down_keys:
+        if k_fire in down_keys:
             if self.fire:
                 self.game.bullets.append(
                     Bullet(self.pos,
@@ -86,36 +97,36 @@ class Player(Char):
                     self.darttime = time.time() + 1
                 else:
                     self.darttime = time.time() + 0.1
-        if K_MINE in down_keys:
+        if k_mine in down_keys:
             if self.fire or self.effect & MAGAZINE:
                 self.game.bullets.append(
                     Bullet(self.pos, (0, 0),
                            [],
-                           cache("BULLET"),
+                           MINE,
                            self, True))
                 if not self.effect & MAGAZINE:
                     self.fire = False
                     self.darttime = time.time() + 0.1
-        if K_UP in down_keys:
+        if k_up in down_keys:
             self.pos[1] -= speed
             going.append(UP)
-            if K_DOWN in down_keys:
-                del down_keys[K_DOWN]  # 不能同时向上和下走
-        if K_DOWN in down_keys:
+            if k_down in down_keys:
+                del down_keys[k_down]  # 不能同时向上和下走
+        if k_down in down_keys:
             self.pos[1] += speed
             going.append(DOWN)
-            if K_UP in down_keys:
-                del down_keys[K_UP]  # 不能同时向上和下走
-        if K_LEFT in down_keys:
+            if k_up in down_keys:
+                del down_keys[k_up]  # 不能同时向上和下走
+        if k_left in down_keys:
             self.pos[0] -= speed
             going.append(LEFT)
-            if K_RIGHT in down_keys:
-                del down_keys[K_RIGHT]  # 不能同时向左和右走
-        if K_RIGHT in down_keys:
+            if k_right in down_keys:
+                del down_keys[k_right]  # 不能同时向左和右走
+        if k_right in down_keys:
             self.pos[0] += speed
             going.append(RIGHT)
-            if K_LEFT in down_keys:
-                del down_keys[K_LEFT]  # 不能同时向左和右走
+            if k_left in down_keys:
+                del down_keys[k_left]  # 不能同时向左和右走
         # print(going)
         if not going:
             pass
@@ -153,7 +164,7 @@ class Player(Char):
     def render(self):
         if time.time() < self.endtime:
             return
-        self.img = cache("PLAYER", self.angle)
+        self.img = cache("PLAYER%d" % self.cnt, self.angle)
         self.rect = self.img.get_rect()
         self.rect.center = self.pos
 
@@ -168,30 +179,30 @@ class Player(Char):
 
     def draw_blood(self, win):
         for i in range(self.blood):  # draw health bars
-            pygame.draw.rect(win, RED, (15, 15+(10*MAXBLOOD) - i*20, 30, 20))
-        for i in range(MAXBLOOD):
-            pygame.draw.rect(
-                win, WHITE, (15, 15+(10*MAXBLOOD) - i*20, 30, 20), 1)
+            pygame.draw.rect(win, self.bloodcolor, (self.blood_xstart, 15+(10*MAXBLOOD) - i*20, 30, 20))
+        for i in range(MAXBLOOD):  # draw white outsides
+            pygame.draw.rect(win, WHITE,
+                             (self.blood_xstart, 15+(10*MAXBLOOD) - i*20, 30, 20), 1)
 
     def draw_effects(self, win):
         t = time.time()
         for i in range(len(self.stop)):
             img = IMG[POWERUPS[i]]
             rect = img.get_rect()
-            rect.center = (MAXWIDTH - 40 - 40*i, 30)
+            rect.center = (self.effect_xstart+80+40*i, 30)
             pygame.draw.rect(win, WHITE, rect)
             win.blit(img, rect)
             pygame.draw.rect(win, BLACK, rect, 1)
             if self.stop[i] >= time.time():
-                img2, rect2 = text(NUMFONT, str(round(self.stop[i]-t, 1)),
-                                   center=(MAXWIDTH - 40 - 40*i,
-                                           70), _bg=False)
+                img2, rect2 = mktext(NUMFONT, str(round(self.stop[i]-t, 1)),
+                                     center=(self.effect_xstart+80+40*i,
+                                             70), _bg=False)
                 pygame.draw.rect(win, WHITE, rect2)
 
             else:
                 img2 = IMG["CROSS"]
                 rect2 = img2.get_rect()
-                rect2.center = (MAXWIDTH - 40 - 40*i, 70)
+                rect2.center = (self.effect_xstart+80+40*i, 70)
 
             win.blit(img2, rect2)
             pygame.draw.rect(win, BLACK, rect2, 1)
@@ -340,53 +351,49 @@ class Bullet:
 
 
 class Game:
-    def __init__(self, player_pos_tup, *, pkl_load=False):
+    def __init__(self, player_pos_tup):
         self.ratio = 1
         self.pos_cache = player_pos_tup[:]
-        self.window = pygame.display.set_mode(SIZE)
-        pygame.display.set_caption("War Tanks %s,by xkcdjerry" % VERSION)
-        pygame.display.set_icon(ICON)
+        self.window = get_window()
 
-        if pkl_load is True:
-            pass
-        else:
-            self.new()
-
-    def new(self):
-        self.clock = pygame.time.Clock()
-        self.count = 0
-        self.best = get_best()
-        self.players = [Player(i, self) for i in self.pos_cache]
         self.down_keys = {}
         self.bullets = []
         self.stuff = []
         self.foes = []
+        self.packs = []
+        self.dead_players = []
+        self.new()
+
+    def new(self):
+        # this is called to rewind a game
+        self.clock = pygame.time.Clock()
+        self.count = 0
+        self.best = get_best()
+        if len(self.pos_cache) == 1:
+            self.players = [Player(self.pos_cache[0], self, oneplayer=True)]
+        else:
+            self.players = [Player(i, self, cnt) for cnt, i in enumerate(self.pos_cache)]
+        self.down_keys.clear()
+        self.bullets.clear()
+        self.stuff.clear()
+        self.foes.clear()
+        self.dead_players.clear()
         self.bonus = 0
         self.score = 0
         self.window.blit(BG, (0, 0))
         pygame.display.update()
         self.characters = [*self.players]
-        self.packs = []
+        self.packs.clear()
         # keep pos_cache,window and clock
 
-    def __getstate__(self):
-        return ((self.count, self.players, self.bullets),
-                (self.stuff, self.foes, self.bonus, self.pos_cache),
-                (self.score, self.characters, self.packs))
-
-    def __setstate__(self, tup):
-        self.count, self.players, self.bullets = tup[0]
-        self.stuff, self.foes, self.bonus, self.pos_cache = tup[1]
-        self.score, self.characters, self.packs = tup[2]
-        self.__init__(self.pos_cache, pkl_load=True)
-
-    def stop(self):
-
+    @staticmethod
+    def stop():
         pygame.quit()
 
     def render(self):
         self.window.blit(BG, (0, 0))  # back ground
-
+        for i in self.dead_players:
+            self.window.blit(TOMB, i.rect)
         for i in self.bullets:
             self.window.blit(i.img, i.rect)
             if i.rect.right < 0:
@@ -415,17 +422,17 @@ class Game:
 
         for i in self.players:
             i.blit(self.window)
-        img, rect = text(NUMFONT, "Score:%i" % self.score,
-                         center=(WIDTH//2, 40), _bg=False)
+        img, rect = mktext(NUMFONT, "Score:%i" % self.score,
+                           center=(WIDTH//2, 40), _bg=False)
 
         self.window.blit(img, rect)
-        img2, rect2 = text(NUMFONT, "Best Score:%i" %
-                           self.best, center=(WIDTH//2, 80), _bg=False)
+        img2, rect2 = mktext(NUMFONT, "Best Score:%i" %
+                             self.best, center=(WIDTH//2, 80), _bg=False)
 
         self.window.blit(img2, rect2)
         for i in self.players:
             i.draw_effects(self.window)
-            i.draw_blood(self.window)  # bug:stats overlap
+            i.draw_blood(self.window)
         pygame.display.update()
 
     def add_enemys(self):
@@ -437,11 +444,11 @@ class Game:
                         (-SPEED, 0))
             self.foes.append(foe)
             self.characters.append(foe)
-        if i % (80//ratio) == random.randint(0, (80//ratio)-1):
+        if i % (100//ratio) == random.randint(0, (100//ratio)-1):
             packet = Packet([random.randint(0, MAXWIDTH), random.randint(
                 0, MAXHIGHT)], random.choice(POWERUPS), self)
             self.packs.append(packet)
-        if i % (100//ratio) == random.randint(0, (100//ratio)-1):
+        if i % (300//ratio) == random.randint(0, (300//ratio)-1):
             stuff = Stuff([random.randint(0, MAXWIDTH), random.randint(
                 0, MAXHIGHT)], random.choice(STUFF), self)
             self.stuff.append(stuff)
@@ -450,7 +457,6 @@ class Game:
         for event in pygame.event.get():
 
             if event.type == pygame.QUIT:
-                running = False
                 save_best(self.best)
                 return True, self.clock.get_fps()  # stop!
 
@@ -464,18 +470,16 @@ class Game:
         global BUL_SPD, SPEED
         running = True
         self.count = 0
-        stop = False
+        t = 0
         while running:
 
             self.count += 1
 
-            clock_fps = self.clock.get_fps()
-            fps = clock_fps if clock_fps else FPS  # avoid ZeroDivisionError
+            fps = self.count/t if self.count > 10 else FPS  # avoid Bad averages
             ratio = FPS/fps
             BUL_SPD = INIT_BUL_SPD*ratio
             SPEED = INIT_SPEED*ratio
             self.ratio = ratio
-
             self.add_enemys()
 
             temp = self.handle_events()
@@ -518,15 +522,14 @@ class Game:
                         hit.stop[index_effect(SHIELD)] -= 10
                     if hit.blood <= 0:
                         self.players.remove(hit)
+                        self.dead_players.append(hit)
                         if len(self.players) == 0:
-                            end = time.time()
                             self.window.blit(BG, (0, 0))  # back ground
                             self.explode(hit)
                             pygame.time.wait(500)  # clear the que
                             pygame.event.get()
                             self.gameover(self.score)
                             stop = waitforkey()
-                            running = False
                             save_best(self.best)
                             return stop, self.clock.get_fps()
 
@@ -550,19 +553,19 @@ class Game:
             self.best = max(self.best, self.score)
             self.render()
 
-            self.clock.tick(MAX_FPS)
+            t += self.clock.tick(MAX_FPS)/1000   # milliseconds too seconds
 
     def gameover(self, score):
         # The game over code
-        surf, rect = text(GAMEOVERFONT,
-                          "Game Over,Your score:%.2f" % score,
-                          _bg=False)
+        surf, rect = mktext(GAMEOVERFONT,
+                            "Game Over,Your score:%.2f" % score,
+                            _bg=False)
         self.window.blit(surf, rect)
-        surf2, rect2 = text(GAMEOVERFONT, "Press any key to continue.",
-                            center=[MID[0], MID[1]+TEXTSIZE+20], _bg=False)
+        surf2, rect2 = mktext(GAMEOVERFONT, "Press any key to continue.",
+                              center=[MID[0], MID[1]+TEXTSIZE+20], _bg=False)
         self.window.blit(surf2, rect2)
-        surf3, rect3 = text(GAMEOVERFONT, "Best score:%.2f" % self.best,
-                            center=[MID[0], MID[1]+TEXTSIZE*2+20*2], _bg=False)
+        surf3, rect3 = mktext(GAMEOVERFONT, "Best score:%.2f" % self.best,
+                              center=[MID[0], MID[1]+TEXTSIZE*2+20*2], _bg=False)
         self.window.blit(surf3, rect3)
         pygame.display.update()
 
