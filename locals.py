@@ -1,5 +1,6 @@
 import os
 import pickle
+import json
 
 import pygame
 
@@ -7,7 +8,9 @@ import virtual
 
 virtual.init()
 
-VERSION = '2.0.0'
+with open("config.json") as jsonfile:
+    dct = json.load(jsonfile)
+VERSION = dct["version"]
 BESTSCOREFILE = virtual.transform_name('bestscore.dat')
 SIZE = WIDTH, HIGHT = 1300, 800
 MID = WIDTH/2, HIGHT/2
@@ -152,17 +155,16 @@ def mktext(font, text, color=BLACK, bg=WHITE, center=MID, _bg=True):
 
 
 def waitforkey():
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+    pygame.event.clear()
+    event = pygame.event.wait()
+    if event.type == pygame.QUIT:
+        pygame.event.clear()
+        return True  # stop
 
-                pygame.event.get()
-                return True  # stop
+    if event.type == pygame.KEYDOWN:
 
-            if event.type == pygame.KEYDOWN:
-
-                pygame.event.get()
-                return False
+        pygame.event.clear()
+        return False
 
 
 def merge_stoptime(stop1, stop2):

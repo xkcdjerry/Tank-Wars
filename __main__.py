@@ -34,6 +34,7 @@ def select():
                 for j in range(len(player_lst)):
                     if player_lst[j][1].collidepoint(i.pos):
                         ans = j+1
+    pygame.event.clear()
     return ans
 
 
