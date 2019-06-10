@@ -4,9 +4,25 @@ import itertools
 
 from locals import *
 
-# TODO:when in many-player mode,keep  a scoreboard for every player (the per-player scoreboard is not saved)
 # 目的：完全整合各类，消除Game类里本该是其它类的冗余代码
 # 使得他容易拓展成联网版本（未开始拓展）
+pygame.event.set_blocked(None)
+pygame.event.set_allowed([pygame.KEYUP, pygame.KEYDOWN, pygame.QUIT, pygame.MOUSEBUTTONDOWN])
+
+
+class Proxy:
+    def __init__(self, dct=None):
+        self._dct = {} if dct is None else dct
+
+    def __setattr__(self, key, val):
+        if key.startswith("_"):
+            super().__setattr__(key, val)
+        self._dct[key] = val
+
+    def __getattr__(self, key):
+        if key.startswith("_"):
+            return super().__getattribute__(key)
+        return self._dct[key]
 
 
 class Char:
@@ -19,12 +35,13 @@ class Player(Char):
     STARTS = (MAXWIDTH-80-len(POWERUPS)*40, 15)
     BLOODCOLORS = (GREEN, ORANGE)
     IMGS = (PLAYER0, PLAYER1)
-    # in range:LEFT      DOWN      RIGHT     UP        FIRE        MINES
+    # LEFT      DOWN      RIGHT     UP        FIRE        MINES
+
     ALL = (
         (pygame.K_a, pygame.K_s, pygame.K_d, pygame.K_w,
          pygame.K_j, pygame.K_k),
         (pygame.K_LEFT, pygame.K_DOWN, pygame.K_RIGHT, pygame.K_UP,
-         pygame.K_KP0, pygame.K_KP_PERIOD)
+         pygame.K_COMMA, pygame.K_PERIOD)
     )
 
     def __init__(self, pos, game, cnt=0, oneplayer=False):
@@ -36,6 +53,7 @@ class Player(Char):
 
 
         """
+        self.score = 0
         self.cnt = cnt if not oneplayer else 0  # use the green
         self.movekeys = Player.ALL[cnt] if not oneplayer else Player.ALL[0]
         self.blood_xstart = Player.STARTS[cnt] if not oneplayer else Player.STARTS[-1]
@@ -81,7 +99,7 @@ class Player(Char):
             speed = SPEED*2
         else:
             speed = SPEED
-        if time.time() > self.darttime:
+        if time.time() >= self.darttime:
             self.fire = True
         if k_fire in down_keys:
             if self.fire:
@@ -140,20 +158,20 @@ class Player(Char):
         self.rect.center = self.pos
         if self.rect.left < 0:
             self.rect.left = SPEED  # 防卡住
-            if LEFT in down_keys:
-                del down_keys[LEFT]  # 不能再走了！
+            if k_left in down_keys:
+                del down_keys[k_left]  # 不能再走了！
         if self.rect.top < 0:
             self.rect.top = SPEED  # 防卡住
-            if UP in down_keys:
-                del down_keys[UP]  # 不能再走了！
+            if k_up in down_keys:
+                del down_keys[k_up]  # 不能再走了！
         if self.rect.bottom > MAXHIGHT:
             self.rect.bottom = MAXHIGHT - SPEED  # 防卡住
-            if DOWN in down_keys:
-                del down_keys[DOWN]  # 不能再走了！
+            if k_down in down_keys:
+                del down_keys[k_down]  # 不能再走了！
         if self.rect.right > MAXWIDTH:
             self.rect.right = MAXWIDTH - SPEED  # 防卡住
-            if RIGHT in down_keys:
-                del down_keys[RIGHT]  # 不能再走了！
+            if k_down in down_keys:
+                del down_keys[k_right]  # 不能再走了！
         targets = self.game.foes+[(i if (not i.player) else None)
                                   for i in self.game.bullets]
         for i in self.game.bullets:
@@ -206,6 +224,12 @@ class Player(Char):
 
             win.blit(img2, rect2)
             pygame.draw.rect(win, BLACK, rect2, 1)
+
+    def draw_score(self, win):
+        text = "Player %d Kills : %d" % (self.cnt+1, self.score)
+        img, rect = mktext(NUMFONT, text, _bg=False)
+        rect.center = (self.effect_xstart+80, 100)
+        win.blit(img, rect)
 
     def add_stuff(self, typeof):
         return Player.OPR[typeof](self)
@@ -287,6 +311,7 @@ class NullBot(Char):
 class Enemy(Char):
     def __init__(self, ai, pos, spd):
         self.ai = ai
+        self.killer = Proxy({"score":0})
         self.pos = list(pos)
         self.spd = spd
         ai.robot = self
@@ -353,9 +378,10 @@ class Bullet:
 class Game:
     def __init__(self, player_pos_tup):
         self.ratio = 1
+        self.player_cnt = len(player_pos_tup)
+        self.many_player = self.player_cnt > 1
         self.pos_cache = player_pos_tup[:]
         self.window = get_window()
-
         self.down_keys = {}
         self.bullets = []
         self.stuff = []
@@ -402,10 +428,11 @@ class Game:
             if i.img != EXPLODE:
                 i.update()
             else:
-
+                killer = i.killer
                 for j in self.foes:
                     if j.rect.colliderect(i.rect) and not j.effect & SHIELD:
                         self.explode(j)
+                        j.killer = killer
                         # merge_stoptime(self.player.stop,j.stop)
                         self.bonus += 5
                     else:
@@ -433,12 +460,15 @@ class Game:
         for i in self.players:
             i.draw_effects(self.window)
             i.draw_blood(self.window)
+        if self.many_player:
+            for i in self.players:
+                i.draw_score(self.window)
         pygame.display.update()
 
-    def add_enemys(self):
+    def add_entitys(self):
         ratio = self.ratio
         i = self.count
-        if i % (30//ratio) == random.randint(0, (30//ratio)-1):
+        if i % (20//(ratio*(0.5+self.player_cnt*0.5))) == random.randint(0, (20//(ratio*(0.5+self.player_cnt*0.5))-1)):
             foe = Enemy(Ai(self, ratio),
                         (WIDTH+10, random.randint(0, MAXHIGHT)),
                         (-SPEED, 0))
@@ -458,13 +488,14 @@ class Game:
 
             if event.type == pygame.QUIT:
                 save_best(self.best)
-                return True, self.clock.get_fps()  # stop!
+                return True, self.fps  # stop!
 
             elif event.type == pygame.KEYDOWN:
                 self.down_keys[event.key] = True
             elif event.type == pygame.KEYUP:
                 if event.key in self.down_keys:
                     del self.down_keys[event.key]
+
 
     def run(self):
         global BUL_SPD, SPEED
@@ -477,10 +508,11 @@ class Game:
 
             fps = self.count/t if self.count > 10 else FPS  # avoid Bad averages
             ratio = FPS/fps
+            self.fps = fps
             BUL_SPD = INIT_BUL_SPD*ratio
             SPEED = INIT_SPEED*ratio
             self.ratio = ratio
-            self.add_enemys()
+            self.add_entitys()
 
             temp = self.handle_events()
             if temp:  # stop
@@ -497,6 +529,7 @@ class Game:
                     self.stuff.remove(j)
             for j in self.foes:
                 if j.img == EXPLODE:
+                    j.killer.score += 1
                     self.kill_foe(j)
                 for i in self.players:
                     if i.effect & SHIELD and j.rect.colliderect(i.rect):
@@ -531,7 +564,7 @@ class Game:
                             self.gameover(self.score)
                             stop = waitforkey()
                             save_best(self.best)
-                            return stop, self.clock.get_fps()
+                            return stop, self.fps
 
                 elif hit in self.foes:
                     if hit.effect & SHIELD and not j.anti_shield:
@@ -540,7 +573,9 @@ class Game:
                         continue
                     self.explode(hit)
                     if j.player:
+                        hit.killer = j.player
                         j.player.effect |= hit.effect
+                        j.player.score += 1
                         merge_stoptime(j.player.stop, hit.stop)
                         self.bonus += 10
                 elif hit in self.bullets:
@@ -584,6 +619,6 @@ class Game:
         pygame.display.flip()
 
     def kill_foe(self, foe):
-        # Remove the foe and add score
+        # Remove the foe
         self.foes.remove(foe)
         self.characters.remove(foe)
