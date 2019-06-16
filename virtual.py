@@ -2,7 +2,8 @@ import os
 
 import pygame
 
-BASE = "Bin"
+PATH = os.path.dirname(__file__)
+BASE = os.path.join(PATH,"Bin")
 WIDTH = HIGHT = None
 SMMOTH = True
 

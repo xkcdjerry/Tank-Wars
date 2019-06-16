@@ -1,9 +1,21 @@
 ﻿import sys
+import os
 
 import pygame
 
 from classes import Game
 from locals import MID, FPS, BG, SIZE, SELECT_PLAYER_IMGS, get_window, TITLE
+
+
+PATH = os.path.dirname(__file__)
+
+
+def getname():
+    i = 1
+    fmt = os.path.join(PATH, "..", "bugreport%i.txt")
+    while os.path.isfile(fmt % i):
+        i += 1
+    return fmt % i
 
 
 def select():
@@ -38,7 +50,7 @@ def select():
     return ans
 
 
-def main():
+def _main():
     stop = False
     old_num_players = -1
     game = Game(())
@@ -53,9 +65,9 @@ def main():
             stop, fps_real = game.run()
             frame_ratio = FPS/fps_real
 
-        except BaseException:
+        except BaseException as e:
             # makes sure it's shut down right
-            pygame.quit()
+            game.stop()
             raise
         print('RATIO:', frame_ratio, 'FPS:', fps_real)
         game.new()
@@ -64,6 +76,23 @@ def main():
     return game
 
 
+def main():
+    try:
+        _main()
+    except Exception as e:
+        import traceback
+        print("Error Found...")
+        print("Shutting down program...")
+        s = traceback.format_exc()
+        with open(getname(), "w") as f:
+            f.write(s)
+            f.write("\n\n")
+            f.write(str(e))
+        traceback.print_exc()
+        return e
+    except (KeyboardInterrupt, SystemExit):  # ignored
+        return
+
+
 if __name__ == '__main__':
-    cached_game = main()
-    # for testing
+    main()
