@@ -6,8 +6,6 @@ from locals import *
 
 # 目的：完全整合各类，消除Game类里本该是其它类的冗余代码
 # 使得他容易拓展成联网版本（未开始拓展）
-pygame.event.set_blocked(None)
-pygame.event.set_allowed([pygame.KEYUP, pygame.KEYDOWN, pygame.QUIT, pygame.MOUSEBUTTONDOWN])
 
 
 class Proxy:
@@ -170,7 +168,7 @@ class Player(Char):
                 del down_keys[k_down]  # 不能再走了！
         if self.rect.right > MAXWIDTH:
             self.rect.right = MAXWIDTH - SPEED  # 防卡住
-            if k_down in down_keys:
+            if k_right in down_keys:
                 del down_keys[k_right]  # 不能再走了！
         targets = self.game.foes+[(i if (not i.player) else None)
                                   for i in self.game.bullets]
@@ -408,7 +406,7 @@ class Game:
         self.score = 0
         self.window.blit(BG, (0, 0))
         pygame.display.update()
-        self.characters = [*self.players]
+        self.characters = self.players.copy()
         self.packs.clear()
         # keep pos_cache,window and clock
 

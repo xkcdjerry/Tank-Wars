@@ -7,8 +7,9 @@ import pygame
 import virtual
 
 virtual.init()
+PATH = os.path.dirname(__file__)
 
-with open("config.json") as jsonfile:
+with open(os.path.join(PATH, "config.json")) as jsonfile:
     dct = json.load(jsonfile)
 VERSION = dct["version"]
 BESTSCOREFILE = virtual.transform_name('bestscore.dat')
@@ -58,8 +59,9 @@ MINE = virtual.load("mine.png")
 SELECT_PLAYER_IMGS = (virtual.load("one_player.png"), virtual.load("two_players.png"))
 EXPLODE = virtual.load("explode.png")
 BG = pygame.transform.smoothscale(virtual.load("bg.png"), SIZE)
-GAMEOVERFONT = pygame.font.Font("freesansbold.ttf", TEXTSIZE)
-NUMFONT = pygame.font.Font("freesansbold.ttf", NUMSIZE)
+FONTNAME = os.path.join(PATH, "freesansbold.ttf")
+GAMEOVERFONT = pygame.font.Font(FONTNAME, TEXTSIZE)
+NUMFONT = pygame.font.Font(FONTNAME, NUMSIZE)
 IMG = {"PLAYER0": PLAYER0,
        "PLAYER1": PLAYER1,
        "TOMB": TOMB,
