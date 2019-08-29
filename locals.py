@@ -12,6 +12,7 @@ PATH = os.path.dirname(__file__)
 with open(os.path.join(PATH, "config.json")) as jsonfile:
     dct = json.load(jsonfile)
 VERSION = dct["version"]
+ENEMY_PER_SPAWN = dct["enemy_per_spawn"]
 BESTSCOREFILE = virtual.transform_name('bestscore.dat')
 SIZE = WIDTH, HIGHT = 1300, 800
 MID = WIDTH/2, HIGHT/2
@@ -34,7 +35,7 @@ INIT_BUL_SPD = 7
 SPEED = INIT_SPEED
 BUL_SPD = INIT_BUL_SPD
 BLOWUPTIME = 0.1  # secs
-MAXBLOOD = 3
+MAXBLOOD = dct["blood"]
 
 SHIELD = 1
 MAGAZINE = 2
@@ -59,7 +60,7 @@ MINE = virtual.load("mine.png")
 SELECT_PLAYER_IMGS = (virtual.load("one_player.png"), virtual.load("two_players.png"))
 EXPLODE = virtual.load("explode.png")
 BG = pygame.transform.smoothscale(virtual.load("bg.png"), SIZE)
-FONTNAME = os.path.join(PATH, "freesansbold.ttf")
+FONTNAME =  "freesansbold.ttf"
 GAMEOVERFONT = pygame.font.Font(FONTNAME, TEXTSIZE)
 NUMFONT = pygame.font.Font(FONTNAME, NUMSIZE)
 IMG = {"PLAYER0": PLAYER0,
@@ -101,8 +102,8 @@ picturecache = {}
 effectcache = {}
 
 
-def get_window():
-    win = pygame.display.set_mode(SIZE)
+def get_window(opts=0):
+    win = pygame.display.set_mode(SIZE,opts)
     pygame.display.set_caption("War Tanks %s,by xkcdjerry" % VERSION)
     pygame.display.set_icon(ICON)
     return win
@@ -117,7 +118,7 @@ def cache(img_name, angle=0):
         return return_img
 
 
-def index_effect(effect):
+def index_effect(effect) -> int:
     if effect in effectcache:
         return effectcache[effect]
     else:
@@ -169,8 +170,7 @@ def waitforkey():
         return False
 
 
-def merge_stoptime(stop1, stop2):
+def merge_stoptime(to, from_):
     """merge stop1 and stop2 to stop1(IN PLACE)"""
-    assert len(stop1) == len(stop2), "different lenth"
-    for i in range(len(stop1)):
-        stop1[i] = max(stop1[i], stop2[i])
+    for i in range(len(to)):
+        to[i] = max(to[i], from_[i])

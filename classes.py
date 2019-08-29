@@ -4,13 +4,18 @@ import itertools
 
 from locals import *
 
+
 # 目的：完全整合各类，消除Game类里本该是其它类的冗余代码
 # 使得他容易拓展成联网版本（未开始拓展）
 
 
 class Proxy:
-    def __init__(self, dct=None):
-        self._dct = {} if dct is None else dct
+    """
+A very stupid proxy
+    """
+
+    def __init__(self, init_dict=None):
+        self._dct = {} if init_dict is None else init_dict
 
     def __setattr__(self, key, val):
         if key.startswith("_"):
@@ -20,21 +25,23 @@ class Proxy:
     def __getattr__(self, key):
         if key.startswith("_"):
             return super().__getattribute__(key)
-        return self._dct[key]
+        return self._dct.get(key, Proxy())
 
 
 class Char:
-    # Father for all player/foes
+    """Father for all player/foes"""
     pass
 
 
 class Player(Char):
-    OPR = {BLOOD: lambda player: player.set_blood(player.blood+1)}
-    STARTS = (MAXWIDTH-80-len(POWERUPS)*40, 15)
+    """Class representing a player"""
+    OPR = {BLOOD: lambda player: player.set_blood(player.blood + 1)}
+    STARTS = (MAXWIDTH - 80 - len(POWERUPS) * 40, 15)
     BLOODCOLORS = (GREEN, ORANGE)
     IMGS = (PLAYER0, PLAYER1)
-    # LEFT      DOWN      RIGHT     UP        FIRE        MINES
 
+    # LEFT, DOWN, RIGHT, UP
+    # FIRE, MINES
     ALL = (
         (pygame.K_a, pygame.K_s, pygame.K_d, pygame.K_w,
          pygame.K_j, pygame.K_k),
@@ -57,7 +64,6 @@ class Player(Char):
         self.blood_xstart = Player.STARTS[cnt] if not oneplayer else Player.STARTS[-1]
         self.effect_xstart = self.blood_xstart if not oneplayer else Player.STARTS[0]
         self.bloodcolor = Player.BLOODCOLORS[cnt] if not oneplayer else RED
-        self.endtime = 0
         self.game = game
         self.angle = 0  # up
         self.pos = list(pos)
@@ -71,22 +77,41 @@ class Player(Char):
         self.effect = 0b000
         self.stop = [0] * len(POWERUPS)
 
-    def set_blood(self, blood):
+    def set_blood(self, blood: int):
+        """Set blood to param blood, change blood to MAXBLOOD and add a shield if it is too high
+
+
+        :param blood: blood to be set
+
+        """
         self.blood = min(blood, MAXBLOOD)
         if blood > MAXBLOOD:
             self.add_effect(SHIELD, 10)
 
-    def add_effect(self, effect, t):
+    def add_effect(self, effect: int, t: int):
+        """
+        Add a effect with time
+        """
         self.effect |= effect
         index = index_effect(effect)
-        self.stop[index] = max(time.time()+t, self.stop[index]+t)
+        self.stop[index] = max(time.time() + t, self.stop[index] + t)
 
-    def stop_effect(self, effect):
-        if self.effect & effect:
+    def stop_effect(self, effect: int):
+        """
+        :param effect: a int used by marking effects
+
+
+        """
+        if self.effect & effect == effect:
             self.effect -= effect
         self.stop[index_effect(effect)] = 0
 
-    def update(self, down_keys):
+    def update(self, down_keys: dict):
+        """
+        update self according to the dict keys
+
+        :param down_keys: a dict, in which a key is a presses key
+        """
         going = []
         k_left, k_down, k_right, k_up, k_fire, k_mine = self.movekeys
         for i in range(len(self.stop)):
@@ -94,7 +119,7 @@ class Player(Char):
                 self.stop_effect(POWERUPS[i])
 
         if self.effect & SWIFT:
-            speed = SPEED*2
+            speed = SPEED * 2
         else:
             speed = SPEED
         if time.time() >= self.darttime:
@@ -103,7 +128,7 @@ class Player(Char):
             if self.fire:
                 self.game.bullets.append(
                     Bullet(self.pos,
-                           (BUL_SPD*self.face[0], BUL_SPD*self.face[1]),
+                           (BUL_SPD * self.face[0], BUL_SPD * self.face[1]),
                            [],
                            cache("BULLET", self.angle),
                            self, self.effect & MAGAZINE))
@@ -143,7 +168,6 @@ class Player(Char):
             going.append(RIGHT)
             if k_left in down_keys:
                 del down_keys[k_left]  # 不能同时向左和右走
-        # print(going)
         if not going:
             pass
         elif len(going) == 1:
@@ -170,21 +194,28 @@ class Player(Char):
             self.rect.right = MAXWIDTH - SPEED  # 防卡住
             if k_right in down_keys:
                 del down_keys[k_right]  # 不能再走了！
-        targets = self.game.foes+[(i if (not i.player) else None)
-                                  for i in self.game.bullets]
+        targets = self.game.foes + [(i if (not i.player) else None)
+                                    for i in self.game.bullets]
         for i in self.game.bullets:
             if i.player:
                 i.targets = targets
         self.render()
 
     def render(self):
-        if time.time() < self.endtime:
-            return
+        """
+        update self and return the player's rect
+        :return: the player's rect
+        """
         self.img = cache("PLAYER%d" % self.cnt, self.angle)
         self.rect = self.img.get_rect()
         self.rect.center = self.pos
+        return self.rect
 
     def blit(self, win):
+        """
+        draw the player on param win
+        :param win: the window of the game
+        """
         if self.effect & SWIFT:
             img, rect = get_img_and_rect("SWIFT", self.angle, self.pos)
             win.blit(img, rect)
@@ -194,42 +225,59 @@ class Player(Char):
             win.blit(img, rect)
 
     def draw_blood(self, win):
+        """
+        draw the players blood bar on param win
+        :param win: the window of the game
+        """
         for i in range(self.blood):  # draw health bars
-            pygame.draw.rect(win, self.bloodcolor, (self.blood_xstart, 15+(10*MAXBLOOD) - i*20, 30, 20))
+            pygame.draw.rect(win, self.bloodcolor, (self.blood_xstart, 15 + (20 * MAXBLOOD) - i * 20, 30, 20))
         for i in range(MAXBLOOD):  # draw white outsides
             pygame.draw.rect(win, WHITE,
-                             (self.blood_xstart, 15+(10*MAXBLOOD) - i*20, 30, 20), 1)
+                             (self.blood_xstart, 15 + (20 * MAXBLOOD) - i * 20, 30, 20), 1)
 
     def draw_effects(self, win):
+        """
+        draw the players effects on param win
+        :param win: the window of the game
+        """
         t = time.time()
         for i in range(len(self.stop)):
             img = IMG[POWERUPS[i]]
             rect = img.get_rect()
-            rect.center = (self.effect_xstart+80+40*i, 30)
+            rect.center = (self.effect_xstart + 80 + 40 * i, 30)
             pygame.draw.rect(win, WHITE, rect)
             win.blit(img, rect)
             pygame.draw.rect(win, BLACK, rect, 1)
             if self.stop[i] >= time.time():
-                img2, rect2 = mktext(NUMFONT, str(round(self.stop[i]-t, 1)),
-                                     center=(self.effect_xstart+80+40*i,
+                img2, rect2 = mktext(NUMFONT, str(round(self.stop[i] - t, 1)),
+                                     center=(self.effect_xstart + 80 + 40 * i,
                                              70), _bg=False)
                 pygame.draw.rect(win, WHITE, rect2)
 
             else:
                 img2 = IMG["CROSS"]
                 rect2 = img2.get_rect()
-                rect2.center = (self.effect_xstart+80+40*i, 70)
+                rect2.center = (self.effect_xstart + 80 + 40 * i, 70)
 
             win.blit(img2, rect2)
             pygame.draw.rect(win, BLACK, rect2, 1)
 
     def draw_score(self, win):
-        text = "Player %d Kills : %d" % (self.cnt+1, self.score)
+        """
+        draw the score on param win
+        :param win: the window of the game
+        """
+        text = "Player %d Kills : %d" % (self.cnt + 1, self.score)
         img, rect = mktext(NUMFONT, text, _bg=False)
-        rect.center = (self.effect_xstart+80, 100)
+        rect.center = (self.effect_xstart + 80, 100)
         win.blit(img, rect)
 
     def add_stuff(self, typeof):
+        """
+        add a stuff's effects to the player
+        :param typeof: the type of stuff
+        :return: the return value of the statement Player.OPR, normally None
+        """
         return Player.OPR[typeof](self)
 
 
@@ -279,17 +327,16 @@ class Ai(Char):
     def update(self):
         self.cnt += 1
         if self.robot.effect & SWIFT:
-            self.robot.pos[0] += self.robot.spd[0]*2
-            self.robot.pos[1] += self.robot.spd[1]*2
+            self.robot.pos[0] += self.robot.spd[0] * 2
+            self.robot.pos[1] += self.robot.spd[1] * 2
         else:
             self.robot.pos[0] += self.robot.spd[0]
             self.robot.pos[1] += self.robot.spd[1]
-        if (self.cnt % ((10//self.ratio) if
-                        self.robot.effect & MAGAZINE
-                        else (100//self.ratio)) ==
-            random.randint(0, 9//self.ratio if self.robot.effect & MAGAZINE
-                           else 99//self.ratio)):
-
+        if (self.cnt % ((10 // self.ratio) if
+            self.robot.effect & MAGAZINE
+            else (100 // self.ratio)) ==
+                random.randint(0, 9 // self.ratio if self.robot.effect & MAGAZINE
+                               else 99 // self.ratio)):
             targets = self.game.players
             self.game.bullets.append(Bullet(self.robot.pos, (-BUL_SPD, 0),
                                             targets, cache("BULLET", 90)))
@@ -309,7 +356,7 @@ class NullBot(Char):
 class Enemy(Char):
     def __init__(self, ai, pos, spd):
         self.ai = ai
-        self.killer = Proxy({"score":0})
+        self.killer = Proxy({"score": 0})
         self.pos = list(pos)
         self.spd = spd
         ai.robot = self
@@ -317,7 +364,7 @@ class Enemy(Char):
         self.img = cache("ENEMY", self.angle)
         self.rect = self.img.get_rect()
         self.effect = 0b000
-        self.stop = [0]*len(POWERUPS)
+        self.stop = [0] * len(POWERUPS)
         self.update()
 
     def update(self):
@@ -327,7 +374,7 @@ class Enemy(Char):
     def add_effect(self, effect, t):
         self.effect |= effect
         index = index_effect(effect)
-        self.stop[index] = max(time.time()+t, self.stop[index]+t)
+        self.stop[index] = max(time.time() + t, self.stop[index] + t)
 
     def stop_effect(self, effect):
         if self.effect & effect:
@@ -412,71 +459,105 @@ class Game:
 
     @staticmethod
     def stop():
+        """shut down the game"""
         pygame.quit()
 
     def render(self):
-        self.window.blit(BG, (0, 0))  # back ground
+        """renew the image and blit it onto the screen"""
+        self.window.blit(BG, (0, 0))  # background
         for i in self.dead_players:
             self.window.blit(TOMB, i.rect)
         for i in self.bullets:
             self.window.blit(i.img, i.rect)
             if i.rect.right < 0:
+                # remove a bullet if it moved off the screen
+                # or there will be no memory left after a few minutes
                 self.bullets.remove(i)
+        blown_up = []
         for i in self.foes:
             if i.img != EXPLODE:
+                # if it has not been hit, update
                 i.update()
             else:
+                # had been hit
                 killer = i.killer
                 for j in self.foes:
-                    if j.rect.colliderect(i.rect) and not j.effect & SHIELD:
-                        self.explode(j)
-                        j.killer = killer
-                        # merge_stoptime(self.player.stop,j.stop)
-                        self.bonus += 5
-                    else:
-                        j.stop_effect(SHIELD)
+                    if j.rect.colliderect(i.rect):
+                        # if the enemy touches another enemy
+                        if not (j.effect & SHIELD):
+                            # and if it has not a shield...
+                            j.killer = killer  # pass the killer player along
+                            merge_stoptime(killer.stop,
+                                           j.stop)  # then add the enemy's power-up stop time to the player's
+
+                            self.bonus += 5
+                            blown_up.append(j)     # add it to the group to be killed
+                            # we do this to avoid exploding many layers in one frame
+
+                        else:
+                            # else break it's shield
+                            j.stop_effect(SHIELD)
                 for j in self.bullets:
                     if j.rect.colliderect(i.rect):
+                        # blow up bullets
                         self.bonus += 1
                         self.bullets.remove(j)
             i.blit(self.window)
             if i.rect.right < 0:
+                # remove any foes who are off the screen
+                # to save memory and CPU
                 self.foes.remove(i)
+        for enemy in blown_up:
+            self.explode(enemy)  # now blow it up
         for i in itertools.chain(self.packs, self.stuff):
+            # blit all the powerups onto the screen
             self.window.blit(i.img, i.rect)
 
         for i in self.players:
+            # blit all the players onto the screen
             i.blit(self.window)
+
+        # show the scores
         img, rect = mktext(NUMFONT, "Score:%i" % self.score,
-                           center=(WIDTH//2, 40), _bg=False)
+                           center=(WIDTH // 2, 40), _bg=False)
 
         self.window.blit(img, rect)
         img2, rect2 = mktext(NUMFONT, "Best Score:%i" %
-                             self.best, center=(WIDTH//2, 80), _bg=False)
+                             self.best, center=(WIDTH // 2, 80), _bg=False)
 
         self.window.blit(img2, rect2)
+
+        # draw player effects
         for i in self.players:
             i.draw_effects(self.window)
             i.draw_blood(self.window)
         if self.many_player:
             for i in self.players:
                 i.draw_score(self.window)
+
+        # update the screen and put all these changes onto it
         pygame.display.update()
 
-    def add_entitys(self):
+    def add_entity(self):
+        """add all the entity's in the game which is not the player"""
         ratio = self.ratio
         i = self.count
-        if i % (20//(ratio*(0.5+self.player_cnt*0.5))) == random.randint(0, (20//(ratio*(0.5+self.player_cnt*0.5))-1)):
-            foe = Enemy(Ai(self, ratio),
-                        (WIDTH+10, random.randint(0, MAXHIGHT)),
-                        (-SPEED, 0))
-            self.foes.append(foe)
-            self.characters.append(foe)
-        if i % (100//ratio) == random.randint(0, (100//ratio)-1):
+
+        # add enemy
+        # TODO: clean up this spaghetti  formula
+        if i % (20 // (ratio * (0.5 + self.player_cnt * 0.5))) == random.randint(0, (
+                20 // (ratio * (0.5 + self.player_cnt * 0.5)) - 1)):
+            for i in range(ENEMY_PER_SPAWN):#old : no for
+                foe = Enemy(Ai(self, ratio),
+                            (WIDTH + 10, random.randint(0, MAXHIGHT)),
+                            (-SPEED, 0))
+                self.foes.append(foe)
+                self.characters.append(foe)
+        if i % (100 // ratio) == random.randint(0, (100 // ratio) - 1):
             packet = Packet([random.randint(0, MAXWIDTH), random.randint(
                 0, MAXHIGHT)], random.choice(POWERUPS), self)
             self.packs.append(packet)
-        if i % (300//ratio) == random.randint(0, (300//ratio)-1):
+        if i % (300 // ratio) == random.randint(0, (300 // ratio) - 1):
             stuff = Stuff([random.randint(0, MAXWIDTH), random.randint(
                 0, MAXHIGHT)], random.choice(STUFF), self)
             self.stuff.append(stuff)
@@ -494,8 +575,11 @@ class Game:
                 if event.key in self.down_keys:
                     del self.down_keys[event.key]
 
-
     def run(self):
+        """
+        run the game once
+        :return: tuple(stop_or_not,fps)
+        """
         global BUL_SPD, SPEED
         running = True
         self.count = 0
@@ -504,13 +588,13 @@ class Game:
 
             self.count += 1
 
-            fps = self.count/t if self.count > 10 else FPS  # avoid Bad averages
-            ratio = FPS/fps
+            fps = self.count / t if self.count > 10 else FPS  # avoid Bad averages
+            ratio = FPS / fps
             self.fps = fps
-            BUL_SPD = INIT_BUL_SPD*ratio
-            SPEED = INIT_SPEED*ratio
+            BUL_SPD = INIT_BUL_SPD * ratio
+            SPEED = INIT_SPEED * ratio
             self.ratio = ratio
-            self.add_entitys()
+            self.add_entity()
 
             temp = self.handle_events()
             if temp:  # stop
@@ -531,13 +615,13 @@ class Game:
                     self.kill_foe(j)
                 for i in self.players:
                     if i.effect & SHIELD and j.rect.colliderect(i.rect):
-                        if (j.effect & SHIELD and not
+                        if not (j.effect & SHIELD and not
                                 i.effect & (SHIELD | SWIFT) ==
                                 (SHIELD | SWIFT)):
-                            continue
-                        self.explode(j)
-                        i.effect |= j.effect
-                        merge_stoptime(i.stop, j.stop)
+                            self.explode(j)
+                            j.killer = i
+                            i.effect |= j.effect
+                            merge_stoptime(i.stop, j.stop)
             for j in self.bullets:
                 if j not in self.characters:
                     self.characters.append(j)
@@ -582,23 +666,27 @@ class Game:
                         self.bonus += 10
                 self.bullets.remove(j)
 
-            self.score = round(self.count/fps)+self.bonus
+            self.score = round(self.count / fps) + self.bonus
             self.best = max(self.best, self.score)
             self.render()
 
-            t += self.clock.tick(MAX_FPS)/1000   # milliseconds too seconds
+            t += self.clock.tick(MAX_FPS) / 1000  # milliseconds too seconds
 
     def gameover(self, score):
+        """
+        show the gameOver text
+        :param score: the score to be shown
+        """
         # The game over code
         surf, rect = mktext(GAMEOVERFONT,
                             "Game Over,Your score:%.2f" % score,
                             _bg=False)
         self.window.blit(surf, rect)
         surf2, rect2 = mktext(GAMEOVERFONT, "Press any key to continue.",
-                              center=[MID[0], MID[1]+TEXTSIZE+20], _bg=False)
+                              center=[MID[0], MID[1] + TEXTSIZE + 20], _bg=False)
         self.window.blit(surf2, rect2)
         surf3, rect3 = mktext(GAMEOVERFONT, "Best score:%.2f" % self.best,
-                              center=[MID[0], MID[1]+TEXTSIZE*2+20*2], _bg=False)
+                              center=[MID[0], MID[1] + TEXTSIZE * 2 + 20 * 2], _bg=False)
         self.window.blit(surf3, rect3)
         pygame.display.update()
 
