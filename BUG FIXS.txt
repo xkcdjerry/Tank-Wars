@@ -1,0 +1,8 @@
+BUG FIX 1£ºFix window unclosable(in waitforkey version 0.0.0a0 to 0.0.0a1 update)
+BUG FIX 2:Fix update slack(in run&render version 1.1.0 to 1.1.1 update)
+BUG FIX 3£ºFixed blood higher than maxblood(in add_blood version 1.1.0 to 1.1.1 update)
+BUG FIX 4:Fixed a wrong final score countup(in run version 1.1.0 to 1.1.1 update)
+BUG FIX 5:Fixed game slowdown when there is a lot of mines.(in run version 1.1.1 to 1.1.2 update)
+BUG FIX 6:Fixed not able to move around when putting down mines (in classes.Player.ALL ,2.0.0a1 to 2.0.0rc0 update)
+BUG FIX 7:Fixed a wrong handling of sys.exit() (in __main__.main,2.0.0rc1 to 2.0.0rc2 update)
+BUG FIX 8:Fixed a wrong handling of killing by shields (in classes.Game.run, 2.0.0rc2 to 2.0.0 update)
