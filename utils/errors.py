@@ -5,7 +5,7 @@ ERR_HEAD = """
 A error has been detected and the game has been shut down.Please contact bookyzhang@qq.com and send this file for help.
 Or send a "issue" to Github xkcdjerry/Tank-Wars,thank you.
 
-一个错误被检测到了，游戏已关闭，请联系bookyhang@qq.com并发送这个文件来获得帮助，或者在GitHub的xkcdjerry/Tank-Wars上添加一个issue，谢谢。
+一个错误被检测到了，游戏已关闭，请联系bookyzhang@qq.com并发送这个文件来获得帮助，或者在GitHub的xkcdjerry/Tank-Wars上添加一个issue，谢谢。
 """
 
 
